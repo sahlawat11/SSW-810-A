@@ -10,6 +10,44 @@ import unittest, os
 from collections import defaultdict
 from prettytable import PrettyTable
 
+class Major:
+
+    def __init__(self, major):
+        self.major = major
+        self.required_courses = set()
+        self.required_electives = set()
+
+    def add_course(self, course, flag):
+        if flag == "R":
+            self.required_courses.add(course)
+        elif flag == "E":
+            self.required_electives.add(course)
+
+    def get_required_courses(self, courses_completed):
+        result_courses = []
+        result_electives = []
+        for course in self.required_courses:
+            if course not in courses_completed:
+                result_courses.append(course)
+        
+        for elective in self.required_electives:
+            if elective not in courses_completed:
+                result_electives.append(elective)
+            else:
+                result_electives = []
+                break
+        
+        return result_courses, result_electives
+
+
+    def details(self):
+        return [self.major, sorted(self.required_courses), sorted(self.required_electives)]
+
+    @staticmethod
+    def fields():
+        return ["Dept", "Required", "Electives"]
+
+
 class Student:
 
     def __init__(self, cwid, name, major):
@@ -17,19 +55,21 @@ class Student:
         self.name = name
         self.major = major
         self.courses = dict()
+        self.required_courses = list()
+        self.required_electives = list()
 
 
     def add_course(self, course, grade):
-        self.courses[course] = grade
+        if grade in ['A', 'A-', 'B+', 'B', 'B-', 'C+', 'C']:
+            self.courses[course] = grade
 
 
     def details(self):
-        return [self.cwid, self.name, sorted(self.courses.keys())]
+        return [self.cwid, self.name, self.major, sorted(self.courses.keys()), sorted(self.required_courses), sorted(self.required_electives)]
 
     @staticmethod
     def fields():
-        return ["CWID", "Name", "Completed Courses"]
-
+        return ["CWID", "Name", "Major", "Completed Courses", "Remaining Required", "Remaining Electives"]
 
 
 class StudentTest(unittest.TestCase):
@@ -39,6 +79,9 @@ class StudentTest(unittest.TestCase):
         self.assertEqual(student_1.name, "Jack")
         self.assertEqual(student_1.major, "Computer Science")
         self.assertEqual(student_1.courses, {})
+        self.assertEqual(student_1.required_courses, [])
+        self.assertEqual(student_1.required_electives, [])
+        
 
     def test_add_course(self):
         student_1 = Student("12345", "Jack", "Computer Science")
@@ -54,8 +97,8 @@ class StudentTest(unittest.TestCase):
         student_2.add_course("SSW 540", "A-")
         student_2.add_course("SSW 810", "A")
 
-        self.assertEqual(student_1.details(), ['10103', 'Baldwin, C', ['SSW 564', 'SSW 567']])
-        self.assertEqual(student_1.details(), ['10103', 'Baldwin, C', ['SSW 564', 'SSW 567']])
+        self.assertEqual(student_1.details(), ['10103', 'Baldwin, C', 'SFEN', ['SSW 564', 'SSW 567'], [], []])
+        self.assertEqual(student_1.details(), ['10103', 'Baldwin, C', 'SFEN', ['SSW 564', 'SSW 567'], [], []])
 
 
 class Instructor:
@@ -65,6 +108,7 @@ class Instructor:
         self.name = name
         self.department = department
         self.courses = defaultdict(int)
+
 
     def add_course(self, course):
         self.courses[course] += 1
@@ -102,9 +146,13 @@ class Repository:
     def __init__(self, dir):
         self.students = dict()
         self.instructors = dict()
+        self.majors = dict()
         self.add_students(os.path.join(dir, "students.txt"))
         self.add_instructors(os.path.join(dir, "instructors.txt"))
         self.add_grades(os.path.join(dir, "grades.txt"))
+        self.add_major_courses(os.path.join(dir, "majors.txt"))
+        self.add_remaining_courses()
+        self.major_pt()
         self.student_pt()
         self.instructor_pt()
 
@@ -113,6 +161,17 @@ class Repository:
         for cwid, name, major in file_reader(students_file_path, 3, "\t"):
             if cwid not in self.students:
                 self.students[cwid] = Student(cwid, name, major)
+
+    
+    def add_major_courses(self, major_file_path):
+        for major, flag, course in file_reader(major_file_path, 3, "\t"):
+            if major not in self.majors:
+                self.majors[major] = Major(major)
+            self.majors[major].add_course(course, flag)
+
+    def add_remaining_courses(self):
+        for student in self.students.values():
+            student.required_courses, student.required_electives = self.majors[student.major].get_required_courses(student.courses)
 
 
     def add_instructors(self, instructor_file_path):
@@ -130,7 +189,18 @@ class Repository:
     def student_pt(self):
         pt = PrettyTable(field_names=Student.fields())
         for student in self.students.values():
-            pt.add_row(student.details())
+            details = student.details()
+            if details[len(details) - 1] == []:
+                details[len(details) - 1] = None
+            pt.add_row(details)
+        print(pt)
+
+
+    def major_pt(self):
+        pt = PrettyTable(field_names=Major.fields())
+
+        for major in self.majors.values():
+            pt.add_row(major.details())
         print(pt)
 
 
@@ -146,13 +216,14 @@ class Repository:
 class RepositoryTest(unittest.TestCase):
 
     def test_init(self):
-        directory_path = "/Users/saranshahlawat/Desktop/Stevens/Semesters/Spring 2019/SSW-810/homework9"
+        directory_path = "/Users/saranshahlawat/Desktop/Stevens/Semesters/Spring 2019/SSW-810/SSW-810-A/source/data_files"
         repo_1 = Repository(directory_path)
-        repo_1_student_expected_dict = {'10103': ['10103', 'Baldwin, C', ['CS 501', 'SSW 564', 'SSW 567', 'SSW 687']], '10115': ['10115', 'Wyatt, X', ['CS 545', 'SSW 564', 'SSW 567', 'SSW 687']], '10172': ['10172', 'Forbes, I', ['SSW 555', 'SSW 567']], '10175': ['10175', 'Erickson, D', ['SSW 564', 'SSW 567', 'SSW 687']], '10183': ['10183', 'Chapman, O', ['SSW 689']], '11399': ['11399', 'Cordova, I', ['SSW 540']], '11461': ['11461', 'Wright, U', ['SYS 611', 'SYS 750', 'SYS 800']], '11658': ['11658', 'Kelly, P', ['SSW 540']], '11714': ['11714', 'Morton, A', ['SYS 611', 'SYS 645']], '11788': ['11788', 'Fuller, E', ['SSW 540']]}
+        repo_1_student_expected_dict = {'10103': ['10103', 'Baldwin, C', 'SFEN', ['CS 501', 'SSW 564', 'SSW 567', 'SSW 687'], ['SSW 540', 'SSW 555'], []], '10115': ['10115', 'Wyatt, X', 'SFEN', ['CS 545', 'SSW 564', 'SSW 567', 'SSW 687'], ['SSW 540', 'SSW 555'], []], '10172': ['10172', 'Forbes, I', 'SFEN', ['SSW 555', 'SSW 567'], ['SSW 540', 'SSW 564'], ['CS 501', 'CS 513', 'CS 545']], '10175': ['10175', 'Erickson, D', 'SFEN', ['SSW 564', 'SSW 567', 'SSW 687'], ['SSW 540', 'SSW 555'], ['CS 501', 'CS 513', 'CS 545']], '10183': ['10183', 'Chapman, O', 'SFEN', ['SSW 689'], ['SSW 540', 'SSW 555', 'SSW 564', 'SSW 567'], ['CS 501', 'CS 513', 'CS 545']], '11399': ['11399', 'Cordova, I', 'SYEN', ['SSW 540'], ['SYS 612', 'SYS 671', 'SYS 800'], []], '11461': ['11461', 'Wright, U', 'SYEN', ['SYS 611', 'SYS 750', 'SYS 800'], ['SYS 612', 'SYS 671'], ['SSW 540', 'SSW 565', 'SSW 810']], '11658': ['11658', 'Kelly, P', 'SYEN', [], ['SYS 612', 'SYS 671', 'SYS 800'], ['SSW 540', 'SSW 565', 'SSW 810']], '11714': ['11714', 'Morton, A', 'SYEN', ['SYS 611', 'SYS 645'], ['SYS 612', 'SYS 671', 'SYS 800'], ['SSW 540', 'SSW 565', 'SSW 810']], '11788': ['11788', 'Fuller, E', 'SYEN', ['SSW 540'], ['SYS 612', 'SYS 671', 'SYS 800'], []]}
         repo_1_student_result_dict = dict()
 
         for student_cwid, values in repo_1.students.items():
             repo_1_student_result_dict[student_cwid] = values.details()
+
         self.assertEqual(repo_1_student_expected_dict, repo_1_student_result_dict)
 
 
@@ -176,6 +247,7 @@ def file_reader(path, num_fields, sep=",", header=False):
 
 def main():
     unittest.main(exit=False, verbosity=2)
+    
 
 if __name__ == '__main__':
     main()
