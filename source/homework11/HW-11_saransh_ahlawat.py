@@ -11,7 +11,7 @@ import sqlite3
 from collections import defaultdict
 from prettytable import PrettyTable
 
-DB_FILE = "/Users/saranshahlawat/Desktop/Stevens/Semesters/Spring 2019/SSW-810/810_startup.db"
+DB_FILE = "/Users/saranshahlawat/Desktop/Stevens/Semesters/Spring 2019/SSW-810/SSW-810-A/source/data_files/810_startup.db"
 
 class Major:
 
