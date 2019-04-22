@@ -1,0 +1,33 @@
+<html>
+  <head>
+    <title>{{ title }}</title>
+  </head>
+
+  <body bgcolor="FFFFFF">
+    {% block body %}
+
+    <h2>{{ page_header }}</h2>
+
+    <h3>{{ page_sub_header }}</h3>
+
+    <table border="1">
+      <th>CWID</th>
+      <th>Name</th>
+      <th>Major</th>
+      <th>Courses</th>
+      <th>Students</th>
+
+      {% for student in students %}
+      <tr>
+        <td>{{ student.cwid }}</td>
+        <td>{{ student.name }}</td>
+        <td>{{ student.dept }}</td>
+        <td>{{ student.course }}</td>
+        <td>{{ student.student_cnt }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    {% endblock %}
+  </body>
+</html>
